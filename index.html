@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>City Care General Hospital — Assistant</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  :root {
+    --primary: #0f766e;
+    --primary-dark: #115e59;
+    --bg: #f4f7f6;
+    --bubble-user: #0f766e;
+    --bubble-bot: #ffffff;
+    --border: #d9e2e0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    display: flex;
+    justify-content: center;
+    padding: 24px;
+  }
+  .app {
+    width: 100%;
+    max-width: 640px;
+    background: white;
+    border-radius: 14px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    height: 85vh;
+    overflow: hidden;
+  }
+  header {
+    background: var(--primary);
+    color: white;
+    padding: 16px 20px;
+  }
+  header h1 { margin: 0; font-size: 18px; }
+  header p { margin: 4px 0 0; font-size: 12px; opacity: 0.85; }
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .msg { max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.4; white-space: pre-wrap; }
+  .user { align-self: flex-end; background: var(--bubble-user); color: white; border-bottom-right-radius: 4px; }
+  .bot { align-self: flex-start; background: var(--bubble-bot); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .typing { align-self: flex-start; color: #888; font-size: 13px; padding: 4px 14px; }
+  form {
+    display: flex;
+    padding: 12px;
+    border-top: 1px solid var(--border);
+    gap: 8px;
+  }
+  input {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 10px 16px;
+    font-size: 14px;
+    outline: none;
+  }
+  input:focus { border-color: var(--primary); }
+  button {
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    padding: 0 20px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  button:hover { background: var(--primary-dark); }
+  .disclaimer { font-size: 11px; color: #888; text-align: center; padding: 6px 12px 10px; }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>City Care General Hospital</h1>
+      <p>Virtual Assistant — timings, departments, booking &amp; billing</p>
+    </header>
+    <div id="messages"></div>
+    <div class="disclaimer">This assistant gives general hospital info only, not medical advice.</div>
+    <form id="chat-form">
+      <input id="chat-input" type="text" placeholder="Ask about OPD timings, booking, billing..." autocomplete="off" />
+      <button type="submit">Send</button>
+    </form>
+  </div>
+
+<script>
+  // Change this if your backend runs on a different host/port
+  const API_URL = "http://localhost:8000/chat";
+
+  const messagesEl = document.getElementById("messages");
+  const formEl = document.getElementById("chat-form");
+  const inputEl = document.getElementById("chat-input");
+
+  let history = [];
+
+  function addMessage(role, text) {
+    const div = document.createElement("div");
+    div.className = "msg " + (role === "user" ? "user" : "bot");
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+  }
+
+  addMessage("bot", "Hi! I'm the City Care General Hospital assistant. Ask me about OPD timings, departments, appointments, billing, or facilities.");
+
+  formEl.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const question = inputEl.value.trim();
+    if (!question) return;
+
+    addMessage("user", question);
+    inputEl.value = "";
+
+    const typingEl = document.createElement("div");
+    typingEl.className = "typing";
+    typingEl.textContent = "Assistant is typing…";
+    messagesEl.appendChild(typingEl);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: question, history }),
+      });
+
+      typingEl.remove();
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        addMessage("bot", "Sorry, something went wrong: " + (err.detail || res.statusText));
+        return;
+      }
+
+      const data = await res.json();
+      addMessage("bot", data.answer);
+
+      history.push({ role: "user", content: question });
+      history.push({ role: "assistant", content: data.answer });
+    } catch (err) {
+      typingEl.remove();
+      addMessage("bot", "Could not reach the server. Is the backend running on " + API_URL + "?");
+    }
+  });
+</script>
+</body>
+</html>
